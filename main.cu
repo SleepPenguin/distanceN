@@ -44,9 +44,24 @@ struct distance
     }
 };
 
+void save(Hvector const &v, std::string filename)
+{
+    std::ofstream out(filename, std::ios::binary);
+    if (out.is_open())
+    {
+        size_t size = v.size();
+        out.write(reinterpret_cast<const char *>(thrust::raw_pointer_cast(v.data())), size * sizeof(double));
+        out.close();
+    }
+    else
+    {
+        std::cerr << "Can't open file " << filename << "\n";
+    }
+}
+
 int main()
 {
-    int N = 10000;
+    int N = 1000;
 
     // Generate 3N random numbers on device.
     thrust::default_random_engine rng(1332);
@@ -55,22 +70,38 @@ int main()
     thrust::generate(h_vec.begin(), h_vec.end(), [&]
                      { return distribute(rng); });
 
+    save(h_vec, "input.dat");
+
     // x0,x1,x2...,y0,y1...,z0,z1...,zN  3*N
     Dvector d_vec = h_vec;
 
-    auto begin = thrust::counting_iterator<int>(0);
-    auto end = thrust::counting_iterator<int>(N * N);
     Dvector d_dis2(N * N);
 
     TICK(distanceCore);
 
-    thrust::transform(begin, end, d_dis2.begin(), distance(N, d_vec));
+    thrust::transform(thrust::counting_iterator<int>(0),
+                      thrust::counting_iterator<int>(N * N), d_dis2.begin(), distance(N, d_vec));
 
     checkCudaErrors(cudaDeviceSynchronize()); // spend more time than core
     TOCK(distanceCore);
 
-    // Hvector h_dis2 = d_dis2;
+    Hvector h_dis2 = d_dis2;
+    save(h_dis2, "output.dat");
 
     // std::cout << h_vec << std::endl;
     // std::cout << h_dis2 << std::endl;
+
+    // check errors
+    TICK(errorCheck);
+    for (int id = 0; id < h_dis2.size(); id++)
+    {
+        int i = id / N;
+        int j = id % N;
+        double h_res = (h_vec[i] - h_vec[j]) * (h_vec[i] - h_vec[j]) +
+                       (h_vec[i + N] - h_vec[j + N]) * (h_vec[i + N] - h_vec[j + N]) +
+                       (h_vec[i + 2 * N] - h_vec[j + 2 * N]) * (h_vec[i + 2 * N] - h_vec[j + 2 * N]);
+        if ((h_res - h_dis2[id]) > 1e-5)
+            printf("error id %d\n, cpu res %.4f, gpu res %.4f\n", id, h_res, h_dis2[id]);
+    }
+    TOCK(errorCheck);
 }
