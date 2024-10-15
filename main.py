@@ -21,7 +21,7 @@ if N <= 1000:
     print(f"cuda: {np.mean(cuda_out2)}")
 else:
     print("N is too large, use random func.")
-    in_mat = np.random.rand(N, 3)
+    in_mat = np.random.rand(N, 3).astype(np.float64)
     start_time = time.time()
     output = cdist(in_mat, in_mat, "euclidean")  # distance_matrix(a, b)
     end_time = time.time()
