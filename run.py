@@ -24,5 +24,5 @@ if build_result.returncode != 0:
     print("CMake build failed. Exiting...")
     exit(1)
 
-print("=====start run main=====")
+print("=====start run release main=====")
 subprocess.run(run_command)
